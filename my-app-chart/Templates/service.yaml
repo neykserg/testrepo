@@ -1,0 +1,21 @@
+[usertest@localhost my-app-chart]$ cat > templates/service.yaml << 'EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "my-app.fullname" . }}
+  labels:
+    {{- include "my-app.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+    # Дополнительный порт для метрик
+    - port: 9113
+      targetPort: 9113
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "my-app.selectorLabels" . | nindent 4 }}
