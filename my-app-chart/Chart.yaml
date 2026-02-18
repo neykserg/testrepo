@@ -1,1 +1,9 @@
-#Test
+apiVersion: v2
+name: my-python-app
+description: Python Flask application for GitOps assignment
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: NeykolyukSA
+    email: neykserg@gmail.com
