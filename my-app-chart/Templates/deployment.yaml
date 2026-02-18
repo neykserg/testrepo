@@ -1,0 +1,313 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "my-app.fullname" . }}
+  labels:
+    {{- include "my-app.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "my-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "my-app.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "my-app.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          
+          # ============================================
+          # CUSTOM APPLICATION CONFIGURATION
+          # ============================================
+          # Создаем кастомную страницу с приветствием и информацией
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Создаем кастомную страницу с информацией о приложении
+              cat > /usr/share/nginx/html/index.html << 'INDEX'
+              <!DOCTYPE html>
+              <html>
+              <head>
+                  <title>Welcome to My App</title>
+                  <style>
+                      body {
+                          font-family: 'Arial', sans-serif;
+                          margin: 0;
+                          padding: 0;
+                          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                          color: white;
+                          text-align: center;
+                          min-height: 100vh;
+                          display: flex;
+                          flex-direction: column;
+                          justify-content: center;
+                          align-items: center;
+                      }
+                      .container {
+                          background: rgba(255, 255, 255, 0.1);
+                          border-radius: 10px;
+                          padding: 40px;
+                          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+                          backdrop-filter: blur(4px);
+                          border: 1px solid rgba(255, 255, 255, 0.18);
+                          width: 80%;
+                          max-width: 800px;
+                      }
+                      h1 { font-size: 3em; margin-bottom: 20px; }
+                      .info {
+                          background: rgba(255, 255, 255, 0.2);
+                          border-radius: 5px;
+                          padding: 20px;
+                          margin: 20px 0;
+                          text-align: left;
+                      }
+                      .info-item {
+                          margin: 10px 0;
+                          padding: 10px;
+                          border-bottom: 1px solid rgba(255,255,255,0.3);
+                      }
+                      .label {
+                          font-weight: bold;
+                          color: #ffd700;
+                      }
+                      .probe-info {
+                          display: flex;
+                          justify-content: space-around;
+                          margin-top: 30px;
+                      }
+                      .probe {
+                          background: rgba(0,0,0,0.3);
+                          padding: 15px;
+                          border-radius: 5px;
+                          flex: 1;
+                          margin: 0 10px;
+                      }
+                      .healthy { color: #4caf50; }
+                      .footer {
+                          margin-top: 30px;
+                          font-size: 0.8em;
+                          color: rgba(255,255,255,0.7);
+                      }
+                  </style>
+              </head>
+              <body>
+                  <div class="container">
+                      <h1>🚀 Welcome to My Custom App! 🚀</h1>
+                      
+                      <div class="info">
+                          <div class="info-item">
+                              <span class="label">Application Name:</span> {{ .Values.app.name }}
+                          </div>
+                          <div class="info-item">
+                              <span class="label">Environment:</span> {{ .Values.app.environment }}
+                          </div>
+                          <div class="info-item">
+                              <span class="label">Version:</span> {{ .Chart.AppVersion }}
+                          </div>
+                          <div class="info-item">
+                              <span class="label">Pod Name:</span> $(POD_NAME)
+                          </div>
+                          <div class="info-item">
+                              <span class="label">Node Name:</span> $(NODE_NAME)
+                          </div>
+                          <div class="info-item">
+                              <span class="label">Current Time:</span> $(date)
+                          </div>
+                      </div>
+
+                      <div class="probe-info">
+                          <div class="probe">
+                              <h3>💓 Liveness Probe</h3>
+                              <p>Path: /health</p>
+                              <p class="healthy">✓ Healthy</p>
+                          </div>
+                          <div class="probe">
+                              <h3>✅ Readiness Probe</h3>
+                              <p>Path: /ready</p>
+                              <p class="healthy">✓ Ready</p>
+                          </div>
+                      </div>
+
+                      <div class="footer">
+                          <p>Deployed with Helm | Kubernetes | ArgoCD</p>
+                      </div>
+                  </div>
+              </body>
+              </html>
+              INDEX
+
+              # Создаем health endpoint для liveness probe
+              cat > /usr/share/nginx/html/health << 'HEALTH'
+              {
+                  "status": "healthy",
+                  "timestamp": "$(date -Iseconds)",
+                  "service": "my-app",
+                  "version": "{{ .Chart.AppVersion }}"
+              }
+              HEALTH
+
+              # Создаем ready endpoint для readiness probe
+              cat > /usr/share/nginx/html/ready << 'READY'
+              {
+                  "status": "ready",
+                  "timestamp": "$(date -Iseconds)",
+                  "connections": "{{ .Values.app.config.maxConnections }}",
+                  "features": {
+                      "featureX": {{ .Values.app.config.featureX }},
+                      "featureY": {{ .Values.app.config.featureY }}
+                  }
+              }
+              READY
+
+              # Запускаем nginx
+              nginx -g "daemon off;"
+          
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          
+          # ============================================
+          # PROBES FROM VALUES.YAML
+          # ============================================
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
+              {{- with .Values.livenessProbe.httpGet.httpHeaders }}
+              httpHeaders:
+                {{- toYaml . | nindent 14 }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          {{- end }}
+          
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
+              {{- with .Values.readinessProbe.httpGet.httpHeaders }}
+              httpHeaders:
+                {{- toYaml . | nindent 14 }}
+              {{- end }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          {{- end }}
+          
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.httpGet.path }}
+              port: {{ .Values.startupProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+            successThreshold: {{ .Values.startupProbe.successThreshold }}
+          {{- end }}
+          
+          # Environment variables from ConfigMap
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # ConfigMap environment variables
+            - name: APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: APP_NAME
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: ENVIRONMENT
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: LOG_LEVEL
+            - name: MAX_CONNECTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: MAX_CONNECTIONS
+            - name: TIMEOUT_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: TIMEOUT_SECONDS
+            - name: FEATURE_X
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: FEATURE_X
+            - name: FEATURE_Y
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: FEATURE_Y
+            - name: CUSTOM_MESSAGE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "my-app.fullname" . }}
+                  key: CUSTOM_MESSAGE
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          
+          {{- with .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
