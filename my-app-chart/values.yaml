@@ -1,1 +1,88 @@
-# test
+# Default values for my-app
+
+# Number of replicas
+replicaCount: 2
+
+# Image configuration
+image:
+  repository: testrepo
+  tag: 1.0.0
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Name override
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# Container security context
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Custom application configuration
+app:
+  name: "my-app"
+  environment: "production"
+  logLevel: "info"
+  config:
+    featureX: true
+    featureY: false
+    maxConnections: 1000
+    timeoutSeconds: 30
+
+# ConfigMap data
+configMap:
+  data:
+    APP_NAME: "{{ .Values.app.name }}"
+    ENVIRONMENT: "{{ .Values.app.environment }}"
+    LOG_LEVEL: "{{ .Values.app.logLevel }}"
+    MAX_CONNECTIONS: "{{ .Values.app.config.maxConnections | quote }}"
+    TIMEOUT_SECONDS: "{{ .Values.app.config.timeoutSeconds | quote }}"
+    FEATURE_X: "{{ .Values.app.config.featureX }}"
+    FEATURE_Y: "{{ .Values.app.config.featureY }}"
+    CUSTOM_MESSAGE: "Welcome to my application!"
